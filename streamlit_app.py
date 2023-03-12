@@ -36,32 +36,32 @@ st.title("Player history maker : Pitcher ver.")
 
 # OpenAI APIキーを設定する
 openai_api_key = st.text_input("Enter your OpenAI API key", value="", type="password")
-os.environ["OPENAI_API_KEY"] = openai_api_key
-
-
-# プレフィックスメッセージの準備
-prefix_messages = [
-    {
-        "role": "system", 
-        "content": """
-あなたは野球のデータの専門家です。選手の将来性予測に関する専門家でもあります。入力表と予測表という二つの表について考えます。今から入力表としてある架空の選手の年度別成績表を与えます。次に予測表としてその入力表の続きを決められた年度まで作成して下さい。なお予測表の中の数字はリアリティのある数値を予測して記入しておいて下さい。必ず、最後に入力表の下に予測表を結合するような形で結果を表示して下さい。"
-"""
-}
-]
-
-# LLMの準備
-llm = OpenAIChat(
-    temperature=0, 
-    prefix_messages=prefix_messages,
-    streaming=False
-)
-
-conversation = ConversationChain(
-    llm=llm, 
-    verbose=False,
-    memory=ConversationBufferMemory()
-)
 if openai_api_key:
+    os.environ["OPENAI_API_KEY"] = openai_api_key
+
+
+    # プレフィックスメッセージの準備
+    prefix_messages = [
+        {
+            "role": "system", 
+            "content": """
+    あなたは野球のデータの専門家です。選手の将来性予測に関する専門家でもあります。入力表と予測表という二つの表について考えます。今から入力表としてある架空の選手の年度別成績表を与えます。次に予測表としてその入力表の続きを決められた年度まで作成して下さい。なお予測表の中の数字はリアリティのある数値を予測して記入しておいて下さい。必ず、最後に入力表の下に予測表を結合するような形で結果を表示して下さい。"
+    """
+    }
+    ]
+
+    # LLMの準備
+    llm = OpenAIChat(
+        temperature=0, 
+        prefix_messages=prefix_messages,
+        streaming=False
+    )
+
+    conversation = ConversationChain(
+        llm=llm, 
+        verbose=False,
+        memory=ConversationBufferMemory()
+    )
 
     df_input_table = pd.DataFrame()
     # プロンプトを入力として受け取る
