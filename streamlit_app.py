@@ -41,6 +41,7 @@ st.title("Player's history maker")
 
 # OpenAI APIキーを設定する
 openai_api_key = st.text_input("Enter your OpenAI API key https://platform.openai.com/overview", value="", type="password")
+os.environ["OPENAI_API_KEY"] = openai_api_key
 
 if openai_api_key:
     try:
@@ -70,7 +71,6 @@ if openai_api_key:
 
             # プロンプトからレスポンスを生成し、逐次的に表示する
             if st.button("Generate"):
-                os.environ["OPENAI_API_KEY"] = openai_api_key
                 # プレフィックスメッセージの準備
                 prefix_messages = [
                     {
@@ -103,4 +103,4 @@ if openai_api_key:
                 # 表を表示する
                 st.dataframe(df_stats)
     except Exception as e:
-        print("Error: {}".format(e))
+        st.error("Error: {}".format(e)) 
