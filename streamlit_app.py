@@ -35,7 +35,7 @@ def wiki_to_dataframe(wiki_text):
 st.title("Player history maker : Pitcher ver.")
 
 # OpenAI APIキーを設定する
-openai_api_key = st.text_input("Enter your OpenAI API key", value="", type="password")
+openai_api_key = st.text_input("Enter your OpenAI API key https://platform.openai.com/overview", value="", type="password")
 if openai_api_key:
     os.environ["OPENAI_API_KEY"] = openai_api_key
 
