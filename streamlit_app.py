@@ -41,7 +41,7 @@ st.title("Player's history maker")
 
 # OpenAI APIキーを設定する
 openai_api_key = st.text_input("Enter your OpenAI API key https://platform.openai.com/overview", value="", type="password")
-os.environ["OPENAI_API_KEY"] = openai_api_key
+openai.api_key = openai_api_key
 
 if openai_api_key:
     try:
