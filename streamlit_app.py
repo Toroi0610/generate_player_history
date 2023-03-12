@@ -1,4 +1,5 @@
 import re
+import os
 
 import openai
 import streamlit as st
@@ -35,7 +36,7 @@ st.title("Player history maker : Pitcher ver.")
 
 # OpenAI APIキーを設定する
 openai_api_key = st.text_input("Enter your OpenAI API key", value="", type="password")
-openai.api_key = openai_api_key
+os.environ["OPENAI_API_KEY"] = openai_api_key
 
 
 # プレフィックスメッセージの準備
