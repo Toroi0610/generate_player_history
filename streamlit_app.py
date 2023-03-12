@@ -71,11 +71,12 @@ if openai_api_key:
         st.dataframe(df_input_table)
 
     end_year = st.number_input(label="どの年度まで生成したいですか？", min_value=2023, max_value=2050, value=2030)
-    config = st.text_input("選手の成績について発生させたいイベントを入力して下さい。", value=f"この表の続きを{end_year}年度まで生成して下さい。また、2026年度に怪我をしてしまい、その年度は欠場、それ以降成績が下降して下さい。")
+    config = st.text_input("選手の成績について発生させたいイベントを入力して下さい。", value=f"2026年度に怪我をしてしまい、その年度は欠場、それ以降成績が下降して下さい。")
 
     prompt = f"""
     {df_input_table.to_string(index=False)}
 
+    この表の続きを{end_year}年度まで生成して下さい。
     {config}
     欠場時の成績は全て0を入れて下さい。出力は入力表の下に予測表を結合して一つの表として結果のみを表示して下さい。
     必ず入力表の下に予測表を結合するような形で結果を表示して下さい。
