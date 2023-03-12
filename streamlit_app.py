@@ -71,6 +71,7 @@ if openai_api_key:
 
             # プロンプトからレスポンスを生成し、逐次的に表示する
             if st.button("Generate"):
+                os.environ["OPENAI_API_KEY"] = openai_api_key
                 # プレフィックスメッセージの準備
                 prefix_messages = [
                     {
