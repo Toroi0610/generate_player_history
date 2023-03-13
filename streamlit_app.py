@@ -5,9 +5,19 @@ import openai
 import streamlit as st
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import japanize_matplotlib
+
 from langchain.llms import OpenAIChat
 from langchain.chains import ConversationChain
 from langchain.chains.conversation.memory import ConversationBufferMemory
+
+
+# セッション変数が存在しないときは初期化する
+# ここでは 'counter' というセッション変数を作っている
+if 'generated' not in st.session_state:
+    st.session_state['generated'] = False
+
 
 def wiki_to_dataframe(wiki_text, player_type="pitcher"):
     if player_type == "pitcher":
@@ -56,19 +66,65 @@ def get_stats_table(url:str, player_type:str):
     else:
         return (df_batter, df_pitcher)
 
+@st.cache_data
+def generate_stats(prompt):
+    prefix_messages = [
+        {
+            "role": "system", 
+            "content": "あなたは野球のデータの専門家です。選手の将来性予測に関する専門家でもあります。入力表と予測表という二つの表について考えます。今から入力表としてある架空の選手の年度別成績表を与えます。次に予測表としてその入力表の続きを決められた年度まで作成して下さい。なお予測表の中の数字はリアリティのある数値を予測して記入しておいて下さい。必ず、最後に入力表の下に予測表を結合するような形で結果を表示して下さい。"
+        }
+    ]
+
+    # LLMの準備
+    llm = OpenAIChat(
+        temperature=0, 
+        prefix_messages=prefix_messages,
+        streaming=False
+    )
+
+    conversation = ConversationChain(
+        llm=llm, 
+        verbose=False,
+        memory=ConversationBufferMemory()
+    )
+
+    text = conversation.predict(input=prompt)
+    # st.write(text)
+    print(text)
+    p = text[text.find("\n\n")+2:]
+    stats = p[:p.find("\n\n")]
+    stats = [t.split() for t in stats.split("\n")]
+    df_stats = pd.DataFrame(stats[1:], columns=stats[0])
+    for col in stats[0]:
+        try:
+            df_stats[col] = pd.to_numeric(df_stats[col], errors="raise")
+        except Exception as e:
+            continue
+    
+    st.session_state["generated"] = True
+    return df_stats
+
+# ボタンが押されたときに発火するコールバック
+def generate_click():
+    # ボタンが押されたらセッション変数の値を増やす
+    st.session_state['generated'] = True
+
+# セッション変数の値をリセットするボタン
+def reset_click():
+    st.session_state['generated'] = False
+    st.session_state["df_stats"] = ""
 
 # Streamlitアプリケーションのタイトルを設定する
 st.title("Player's history maker")
 
 # OpenAI APIキーを設定する
 openai_api_key = st.secrets["OPENAI_API_KEY"]
-os.environ["OPENAI_API_KEY"] = openai_api_key
 openai.api_key = openai_api_key
 
 if openai_api_key:
     try:
         models = openai.Model.list()
-        player_type = st.selectbox('Select player type.',('batter', 'pitcher'))
+        player_type = st.selectbox('Select player type.',('pitcher', 'batter'))
         if player_type:
             st.write('You selected:', player_type)
 
@@ -92,38 +148,25 @@ if openai_api_key:
             """
 
             # プロンプトからレスポンスを生成し、逐次的に表示する
+
             if st.button("Generate"):
-                os.environ["OPENAI_API_KEY"] = openai_api_key
-                # プレフィックスメッセージの準備
-                prefix_messages = [
-                    {
-                        "role": "system", 
-                        "content": "あなたは野球のデータの専門家です。選手の将来性予測に関する専門家でもあります。入力表と予測表という二つの表について考えます。今から入力表としてある架空の選手の年度別成績表を与えます。次に予測表としてその入力表の続きを決められた年度まで作成して下さい。なお予測表の中の数字はリアリティのある数値を予測して記入しておいて下さい。必ず、最後に入力表の下に予測表を結合するような形で結果を表示して下さい。"
-                    }
-                ]
+                df_stats = generate_stats(prompt)
+                st.session_state["df_stats"] = df_stats
 
-                # LLMの準備
-                llm = OpenAIChat(
-                    temperature=0, 
-                    prefix_messages=prefix_messages,
-                    streaming=False
-                )
-
-                conversation = ConversationChain(
-                    llm=llm, 
-                    verbose=False,
-                    memory=ConversationBufferMemory()
-                )
-
-                text = conversation.predict(input=prompt)
-                # st.write(text)
-                print(text)
-                p = text[text.find("\n\n")+2:]
-                stats = p[:p.find("\n\n")]
-                stats = [t.split() for t in stats.split("\n")]
-                df_stats = pd.DataFrame(stats[1:], columns=stats[0])
-
-                # 表を表示する
+            # 表を表示する
+            if st.session_state["generated"]:
+                df_stats = st.session_state["df_stats"]
                 st.dataframe(df_stats)
+
+                y = st.selectbox('Select stats.', list(df_stats.columns)[1:])
+                st.line_chart(df_stats, x="年度", y=y)
+                # fig, ax = plt.subplots()
+                # df_stats.plot(x="年度", y=y, ax=ax, legend=False)
+                # ax.set_ylabel(y)
+                # ax.grid()
+                # st.pyplot(fig)
+
+                st.button(label='Reset', on_click=reset_click)
+
     except Exception as e:
         st.error("Error: {}".format(e)) 
