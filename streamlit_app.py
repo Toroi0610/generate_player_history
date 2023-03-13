@@ -36,11 +36,33 @@ def wiki_to_dataframe(wiki_text, player_type="pitcher"):
 
     return df_stats
 
+def shaping_dataframe(df_wiki):
+    df_wiki.columns = list(map(lambda x: x.replace(" ","").replace("丨", "ー"), list(df_wiki.columns)))
+    df_wiki = df_wiki.loc[df_wiki["年度"].apply(lambda x: x.isdigit())]
+    return df_wiki
+
+def get_stats_table(url:str, player_type:str):
+    tables = pd.read_html(url)
+    for table in tables:
+        if "O P S" in list(table.columns):
+            df_batter = shaping_dataframe(table)
+        if "W H I P" in list(table.columns):
+            df_pitcher = shaping_dataframe(table)
+    
+    if player_type == "batter":
+        return df_batter
+    elif player_type == "pitcher":
+        return df_pitcher
+    else:
+        return (df_batter, df_pitcher)
+
+
 # Streamlitアプリケーションのタイトルを設定する
 st.title("Player's history maker")
 
 # OpenAI APIキーを設定する
-openai_api_key = st.text_input("Enter your OpenAI API key https://platform.openai.com/overview", value="", type="password")
+openai_api_key = st.secrets["OPENAI_API_KEY"]
+os.environ["OPENAI_API_KEY"] = openai_api_key
 openai.api_key = openai_api_key
 
 if openai_api_key:
@@ -52,9 +74,9 @@ if openai_api_key:
 
             df_input_table = pd.DataFrame()
             # プロンプトを入力として受け取る
-            input_table = st.text_area("年度別成績表を入力して下さい。Wikipediaでヘッダーから通算成績までを含めてコピー&ペーストで入力して下さい。", height=100)
-            if input_table:
-                df_input_table = wiki_to_dataframe(input_table, player_type=player_type)
+            url = st.text_input("成績を予測したい選手のWikipediaのURLを入力して下さい。", value="https://ja.wikipedia.org/wiki/%E4%BD%90%E3%80%85%E6%9C%A8%E6%9C%97%E5%B8%8C")
+            if url:
+                df_input_table = get_stats_table(url, player_type=player_type)
                 st.dataframe(df_input_table)
 
             end_year = st.number_input(label="どの年度まで生成したいですか？", min_value=2023, max_value=2050, value=2030)
