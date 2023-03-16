@@ -15,8 +15,12 @@ from langchain.chains.conversation.memory import ConversationBufferMemory
 
 # セッション変数が存在しないときは初期化する
 # ここでは 'counter' というセッション変数を作っている
-if 'generated' not in st.session_state:
-    st.session_state['generated'] = False
+if 'stats_generated' not in st.session_state:
+    st.session_state['stats_generated'] = False
+if 'history_generated' not in st.session_state:
+    st.session_state['history_generated'] = False
+    
+    
 
 
 def wiki_to_dataframe(wiki_text, player_type="pitcher"):
@@ -101,18 +105,46 @@ def generate_stats(prompt):
         except Exception as e:
             continue
     
-    st.session_state["generated"] = True
+    st.session_state["stats_generated"] = True
     return df_stats
 
+def generate_history(detail, df_stats):
+
+    prompt = f"""
+    {df_stats.to_string(index=False)}
+
+    上記の年度別投手成績成績表の各年度の成績表から選手のストーリーを描いて下さい。
+    選手の背景情報は、{detail}
+    """
+
+    messages=[
+        {"role": "system", "content": "あなたは野球好きの小説家であり素晴らしいストーリーテラーでもあります。選手の成長具合やもどかしさ苦しさを表現するような文章を生成できます。"},  # 役割設定（省略可）
+        {"role": "user", "content": prompt}
+    ]
+
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=messages,
+        # max_tokens=4096,
+        stop=None,
+        top_p=0.2,
+        temperature=0.7,
+    )
+    st.session_state["history_generated"] = True
+
+    return response["choices"][0]["message"]["content"]
+
+
 # ボタンが押されたときに発火するコールバック
-def generate_click():
+def generate_click(key):
     # ボタンが押されたらセッション変数の値を増やす
-    st.session_state['generated'] = True
+    st.session_state[key] = True
 
 # セッション変数の値をリセットするボタン
 def reset_click():
-    st.session_state['generated'] = False
+    st.session_state['stats_generated'] = False
     st.session_state["df_stats"] = ""
+    st.session_state["history_generated"] = False
 
 # Streamlitアプリケーションのタイトルを設定する
 st.title("Player's history maker")
@@ -131,10 +163,12 @@ if openai_api_key:
             df_input_table = pd.DataFrame()
             # プロンプトを入力として受け取る
             url = st.text_input("成績を予測したい選手のWikipediaのURLを入力して下さい。", value="https://ja.wikipedia.org/wiki/%E4%BD%90%E3%80%85%E6%9C%A8%E6%9C%97%E5%B8%8C")
+            age = st.number_input(label="入団時の年齢を教えて下さい。", min_value=16, max_value=30, value=18)
             if url:
                 df_input_table = get_stats_table(url, player_type=player_type)
-                st.dataframe(df_input_table)
-
+                df_input_table.insert(1, "年齢", np.arange(age, age+df_input_table.shape[0]))
+            st.dataframe(df_input_table)
+    
             end_year = st.number_input(label="どの年度まで生成したいですか？", min_value=2023, max_value=2050, value=2030)
             config = st.text_input("選手の成績について発生させたいイベントを入力して下さい。", value=f"2026年度に怪我をしてしまい、その年度は欠場、それ以降成績が下降した。")
 
@@ -149,22 +183,28 @@ if openai_api_key:
 
             # プロンプトからレスポンスを生成し、逐次的に表示する
 
-            if st.button("Generate"):
+            if st.button("Generate Stats"):
                 df_stats = generate_stats(prompt)
                 st.session_state["df_stats"] = df_stats
 
             # 表を表示する
-            if st.session_state["generated"]:
+            if st.session_state["stats_generated"]:
                 df_stats = st.session_state["df_stats"]
                 st.dataframe(df_stats)
 
-                y = st.selectbox('Select stats.', list(df_stats.columns)[1:])
+                y = st.selectbox('Select stats.', list(df_stats.columns)[1:], index=df_stats.shape[1]-2)
                 st.line_chart(df_stats, x="年度", y=y)
                 # fig, ax = plt.subplots()
                 # df_stats.plot(x="年度", y=y, ax=ax, legend=False)
                 # ax.set_ylabel(y)
                 # ax.grid()
                 # st.pyplot(fig)
+
+                detail = st.text_input("選手の経歴や詳細について入力して下さい。", value=f"3人兄弟の末っ子。広島県出身。高校時代に甲子園で優勝しドラフト1位入団。")
+                if st.button("Generate Story"):
+                    history = generate_history(detail, df_stats)
+                if st.session_state["history_generated"]:
+                    st.text(history)
 
                 st.button(label='Reset', on_click=reset_click)
 
