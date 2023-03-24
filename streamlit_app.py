@@ -1,17 +1,10 @@
 import re
-import os
 
 import openai
 import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import japanize_matplotlib
-
-from langchain.llms import OpenAIChat
-from langchain.chains import ConversationChain
-from langchain.chains.conversation.memory import ConversationBufferMemory
-
 
 # セッション変数が存在しないときは初期化する
 # ここでは 'counter' というセッション変数を作っている
@@ -19,9 +12,6 @@ if 'stats_generated' not in st.session_state:
     st.session_state['stats_generated'] = False
 if 'history_generated' not in st.session_state:
     st.session_state['history_generated'] = False
-    
-    
-
 
 def wiki_to_dataframe(wiki_text, player_type="pitcher"):
     if player_type == "pitcher":
@@ -58,10 +48,11 @@ def shaping_dataframe(df_wiki):
 def get_stats_table(url:str, player_type:str):
     tables = pd.read_html(url)
     for table in tables:
-        if "O P S" in list(table.columns):
-            df_batter = shaping_dataframe(table)
-        if "W H I P" in list(table.columns):
-            df_pitcher = shaping_dataframe(table)
+        if not "代 表" in list(table.columns):
+            if "O P S" in list(table.columns):
+                df_batter = shaping_dataframe(table)
+            if "W H I P" in list(table.columns):
+                df_pitcher = shaping_dataframe(table)
     
     if player_type == "batter":
         return df_batter
@@ -72,30 +63,23 @@ def get_stats_table(url:str, player_type:str):
 
 @st.cache_data
 def generate_stats(prompt):
-    prefix_messages = [
-        {
-            "role": "system", 
-            "content": "あなたは野球のデータの専門家です。選手の将来性予測に関する専門家でもあります。入力表と予測表という二つの表について考えます。今から入力表としてある架空の選手の年度別成績表を与えます。次に予測表としてその入力表の続きを決められた年度まで作成して下さい。なお予測表の中の数字はリアリティのある数値を予測して記入しておいて下さい。必ず、最後に入力表の下に予測表を結合するような形で結果を表示して下さい。"
-        }
+    messages=[
+        {"role": "assistant", "content": "あなたは野球のデータの専門家です。選手の将来性予測に関する専門家でもあります。入力表と予測表という二つの表について考えます。今から入力表としてある架空の選手の年度別成績表を与えます。次に予測表としてその入力表の続きを決められた年度まで作成して下さい。なお予測表の中の数字はリアリティのある数値を予測して記入しておいて下さい。必ず、最後に入力表の下に予測表を結合するような形で結果を表示して下さい。"},  # 役割設定（省略可）
+        {"role": "user", "content": prompt}
     ]
 
-    # LLMの準備
-    llm = OpenAIChat(
-        temperature=0, 
-        prefix_messages=prefix_messages,
-        streaming=False
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=messages,
+        # max_tokens=4096,
+        stop=None,
+        top_p=0.2,
+        temperature=1.0,
     )
-
-    conversation = ConversationChain(
-        llm=llm, 
-        verbose=False,
-        memory=ConversationBufferMemory()
-    )
-
-    text = conversation.predict(input=prompt)
-    # st.write(text)
+    
+    text = response["choices"][0]["message"]["content"]
     print(text)
-    p = text[text.find("\n\n")+2:]
+    p = text[text.find("\n\n")+1:]
     stats = p[:p.find("\n\n")]
     stats = [t.split() for t in stats.split("\n")]
     df_stats = pd.DataFrame(stats[1:], columns=stats[0])
@@ -123,7 +107,7 @@ def generate_history(detail, df_stats):
     ]
 
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4",
         messages=messages,
         # max_tokens=4096,
         stop=None,
@@ -176,9 +160,14 @@ if openai_api_key:
             {df_input_table.to_string(index=False)}
 
             この表の続きを{end_year}年度まで生成して下さい。
-            {config}
-            欠場時の成績は全て0を入れて下さい。出力は入力表の下に予測表を結合して一つの表として結果のみを表示して下さい。
-            必ず入力表の下に予測表を結合するような形で結果を表示して下さい。
+            その際に次の5つのルールに必ず従って下さい。
+            1.結果の出力は入力表の下に予測表を結合した一つの表のみを表示して下さい。
+            2.次の文章を反映した成績表にして下さい。「{config}」
+            3.各指標の数値はこれまでのプロ野球の現実的な値を考慮して入力して下さい。例えば、防御率0.20などは非現実的な数値であるためあまり良くありません。
+            4.全く同じ数値が並ぶ年度があるのは非現実的なのでやめて下さい。
+            5.万が一、欠場する場合の成績は全て0を入れて下さい。
+
+            以下表
             """
 
             # プロンプトからレスポンスを生成し、逐次的に表示する
