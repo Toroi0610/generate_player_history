@@ -153,7 +153,7 @@ if openai_api_key:
                 df_input_table.insert(1, "年齢", np.arange(age, age+df_input_table.shape[0]))
             st.dataframe(df_input_table)
     
-            end_year = st.number_input(label="どの年度まで生成したいですか？", min_value=2023, max_value=2050, value=2030)
+            end_year = st.number_input(label="どの年度まで生成したいかを入力して下さい。", min_value=2023, max_value=2050, value=2030)
             config = st.text_input("選手の成績について発生させたいイベントを入力して下さい。", value=f"2026年度に怪我をしてしまい、その年度は欠場、それ以降成績が下降した。")
 
             prompt = f"""
